@@ -15,23 +15,14 @@ namespace File_Server
     {
         static TcpListener file_Server = new TcpListener(IPAddress.Any, 8888);
         static string pathMainDirectory = $@"{Environment.CurrentDirectory}\Files\";
+
         static async Task Main(string[] args)
         {
-            //string sourceFolder = @"C:\Users\gamej\Desktop\CloudDisk_\Server\File_server\File_Server\bin\Debug\Files\user1\test3\aaaaaaa"; // исходная папка
-            //string zipFile = @"C:\Users\gamej\Desktop\CloudDisk_\Server\File_server\File_Server\bin\Debug\Files\user1\test3\aaaaaaa.zip"; // сжатый файл
-            //ZipFile.CreateFromDirectory(sourceFolder, zipFile);
-
-
-
-            //return;
             file_Server.Start();
+            await Console.Out.WriteLineAsync("Started");
             var t = Task.Run(() => RequestsClientsAsync());
-            Console.WriteLine("Server start");
             t.Wait();
-
         }
-
-
 
         static async Task RequestsClientsAsync()
         {
@@ -39,6 +30,7 @@ namespace File_Server
             {
                 await Task.Yield();
                 TcpClient client = await file_Server.AcceptTcpClientAsync();
+                await Console.Out.WriteLineAsync("Connected");
                 _ = Task.Run(() => GetAndSendRequestAsync(client));
             }
         }
@@ -52,8 +44,6 @@ namespace File_Server
                 string result = Encoding.UTF8.GetString(getBytes, 0, count);
                 var userRequest = JsonSerializer.Deserialize<JsonRequest>(result);
 
-
-
                 if (userRequest.Request == "Info")
                     await FileAndDirectoryInfoAsync(ns, pathMainDirectory + userRequest.Key + @"\" + userRequest.Path);
 
@@ -61,7 +51,7 @@ namespace File_Server
                     await CreateDirectory(ns, pathMainDirectory + userRequest.Key + @"\" + userRequest.Path);
 
                 else if (userRequest.Request == "DeleteFile")
-                    await FileDelete(ns,  pathMainDirectory + userRequest.Key + @"\" + userRequest.Path);
+                    await FileDelete(ns, pathMainDirectory + userRequest.Key + @"\" + userRequest.Path);
 
                 else if (userRequest.Request == "DeleteDirectory")
                     await DeleteDirectory(ns, pathMainDirectory + userRequest.Key + @"\" + userRequest.Path);
@@ -79,6 +69,9 @@ namespace File_Server
 
         static async Task UploadFileAsync(NetworkStream ns, string path)
         {
+            byte[] answer = Encoding.UTF8.GetBytes("ok");
+            await ns.WriteAsync(answer, 0, answer.Length);
+
             byte[] bytes = new byte[4096];
             using (FileStream fs = new FileStream(path, FileMode.OpenOrCreate))
             {
@@ -120,7 +113,7 @@ namespace File_Server
             IEnumerable<string> allDirectory = Directory.EnumerateDirectories(path, "*.*", SearchOption.TopDirectoryOnly);
             foreach (string filename in allDirectory)
             {
-                fileInfo.Append(filename.Substring(filename.LastIndexOf(@"\") + 1) + ";");
+                fileInfo.Append(filename.Substring(filename.LastIndexOf(@"\") + 1) + ";" + filename.Length.ToString() + ";");
             }
 
             byte[] data = Encoding.UTF8.GetBytes(fileInfo.ToString());
@@ -141,7 +134,7 @@ namespace File_Server
 
         static async Task DeleteDirectory(NetworkStream ns, string path)
         {
-            Directory.Delete(path);
+            Directory.Delete(path, true);
             await FileAndDirectoryInfoAsync(ns, path.Substring(0, path.LastIndexOf(@"\")));
         }
     }
@@ -153,4 +146,3 @@ namespace File_Server
         public string Path { get; set; }
     }
 }
-
